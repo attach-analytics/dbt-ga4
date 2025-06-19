@@ -1,10 +1,12 @@
 {{
   config(
-      enabled = false,
+    enabled = false,
   )
 }}
+
 with purchase_with_params as (
-  select * except (ecommerce),
+  select
+    * except (ecommerce),
     ecommerce.total_item_quantity,
     ecommerce.purchase_revenue_in_usd,
     ecommerce.purchase_revenue,
@@ -21,13 +23,17 @@ with purchase_with_params as (
     {{ ga4.unnest_key('event_params', 'shipping', 'double_value') }},
     {{ ga4.unnest_key('event_params', 'affiliation') }}
     {% if var("default_custom_parameters", "none") != "none" %}
-      {{ ga4.stage_custom_parameters( var("default_custom_parameters") )}}
+      ,{{ ga4.stage_custom_parameters(var("default_custom_parameters")) }}
     {% endif %}
     {% if var("purchase_custom_parameters", "none") != "none" %}
-      {{ ga4.stage_custom_parameters( var("purchase_custom_parameters") )}}
+      ,{{ ga4.stage_custom_parameters(var("purchase_custom_parameters")) }}
     {% endif %}
- from {{ref('stg_ga4__events')}}
- where event_name = 'purchase'
+  from {{ ref('stg_ga4__events') }}
+  where event_name = 'purchase'
+    -- Para optimización de consultas incrementales, se filtra por fecha
+    {% if is_incremental() %} 
+      and event_date_dt >= date_sub(current_date(), interval {{ var('static_incremental_days', 3) }} day)
+    {% endif %}
 )
 
 select * from purchase_with_params
