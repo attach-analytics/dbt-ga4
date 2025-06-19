@@ -32,7 +32,7 @@ with purchase_with_params as (
   where event_name = 'purchase'
     -- Para optimización de consultas incrementales, se filtra por fecha
     {% if is_incremental() %} 
-      and event_date_dt >= date_sub(current_date(), interval {{ var('static_incremental_days', 3) }} day)
+      and event_date_dt >= date_sub(current_date(), interval {{ var("static_incremental_days", 3) }} day)
     {% endif %}
 )
 
