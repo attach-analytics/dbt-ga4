@@ -1,3 +1,20 @@
+{{
+    config(
+        materialized = 'incremental',
+        unique_key = ['client_key', 'stream_id'],
+        partition_by={
+            "field": "first_seen_start_date",
+            "data_type": "date"
+        },
+        tags = ["incremental"]
+    )
+}}
+
+{% set partitions_to_replace = ['current_date'] %}
+{% for i in range(var('static_incremental_days', 3)) %}
+    {% set partitions_to_replace = partitions_to_replace.append('date_sub(current_date, interval ' + (i+1)|string + ' day)') %}
+{% endfor %}
+
 select
     client_key,
     stream_id,
@@ -14,5 +31,10 @@ select
         {% endfor %}
     {% endif %}
 from {{ref('fct_ga4__sessions')}}
+
+{% if is_incremental() %}
+    where session_start_date in ({{ partitions_to_replace | join(',') }})
+{% endif %}
+
 group by 1, 2
 
