@@ -1,4 +1,24 @@
--- Stay mindful of performance/cost when using this model. Making this model partitioned on date is not possible because there's no way to create a single record per session AND partition on date. 
+-- Stay mindful of performance/cost when using this model.
+-- Making this model partitioned on date is not possible because there's no way to create a single record 
+-- per session AND partition on date. 
+
+
+{{
+    config(
+        materialized = 'incremental',
+        unique_key = 'session_key',
+        partition_by={
+            "field": "session_start_date",
+            "data_type": "date"
+        },
+        tags = ["incremental"]
+    )
+}}
+
+{% set partitions_to_replace = ['current_date'] %}
+{% for i in range(var('static_incremental_days', 3)) %}
+    {% set partitions_to_replace = partitions_to_replace.append('date_sub(current_date, interval ' + (i+1)|string + ' day)') %}
+{% endfor %}
 
 select
     client_key,
@@ -18,5 +38,10 @@ select
         {% endfor %}
     {% endif %}
 from {{ref('fct_ga4__sessions_daily')}}
+
+{% if is_incremental() %}
+    where session_partition_date in ({{ partitions_to_replace | join(',') }})
+{% endif %}
+
 group by 1,2,3
 
